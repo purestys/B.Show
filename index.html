@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Queridômetro</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#ff7a00;--amber:#ffb347;--dark:#1a1a1a;--green:#00e676;}
+*{box-sizing:border-box;margin:0;padding:0;}
+
+body{
+  font-family:'DM Sans',sans-serif;background:var(--dark);color:#fff;
+  min-height:100vh;padding:28px 20px 80px;position:relative;overflow-x:hidden;
+}
+body::before{
+  content:'';position:fixed;inset:0;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%,rgba(255,122,0,0.15) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 100%,rgba(255,179,71,0.1) 0%,transparent 60%);
+  pointer-events:none;z-index:0;
+}
+
+h1{
+  font-family:'Syne',sans-serif;font-size:clamp(28px,5vw,50px);font-weight:800;letter-spacing:-1px;
+  background:linear-gradient(90deg,#ff7a00,#ffb347,#fff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  text-align:center;margin-bottom:24px;position:relative;z-index:1;
+}
+
+/* ── Tabs ── */
+.tabs{position:relative;z-index:1;display:flex;justify-content:center;gap:8px;margin-bottom:32px;}
+.tab-btn{
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.5px;
+  padding:10px 28px;border-radius:40px;border:1.5px solid rgba(255,122,0,0.35);
+  background:transparent;color:rgba(255,255,255,0.45);cursor:pointer;transition:all 0.22s;
+}
+.tab-btn:hover{color:rgba(255,255,255,0.75);border-color:rgba(255,122,0,0.6);}
+.tab-btn.active{background:linear-gradient(135deg,#ff7a00,#ffb347);border-color:transparent;color:#fff;box-shadow:0 4px 20px rgba(255,122,0,0.35);}
+.page{display:none;}.page.active{display:block;}
+
+/* ── Toast ── */
+#toast{
+  position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-80px);
+  background:#111;border:1px solid var(--orange);color:#fff;
+  padding:10px 22px;border-radius:40px;font-size:14px;z-index:999;
+  transition:transform 0.35s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap;
+}
+#toast.show{transform:translateX(-50%) translateY(0);}
+
+#db-status{position:fixed;bottom:12px;right:14px;font-size:11px;color:rgba(255,255,255,0.28);z-index:10;letter-spacing:0.4px;}
+#db-status.saved{color:rgba(100,255,150,0.6);}
+#db-status.error{color:rgba(255,80,80,0.7);}
+
+/* ── Shared panel ── */
+.panel{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,122,0,0.22);
+  border-radius:20px;padding:28px;margin-bottom:20px;
+}
+.panel h2{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-bottom:4px;}
+.panel .sub{color:rgba(255,255,255,0.4);font-size:13px;margin-bottom:20px;}
+
+select{
+  padding:9px 14px;border-radius:10px;border:1.5px solid rgba(255,122,0,0.45);
+  font-size:14px;font-family:'DM Sans',sans-serif;background:#111;color:#fff;cursor:pointer;outline:none;transition:border-color 0.2s;
+}
+select:focus{border-color:var(--orange);}
+
+/* ── Action buttons ── */
+.btn{
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
+  padding:11px 26px;border-radius:40px;border:none;cursor:pointer;transition:all 0.2s;
+}
+.btn-primary{background:linear-gradient(135deg,#ff7a00,#ffb347);color:#fff;box-shadow:0 4px 18px rgba(255,122,0,0.3);}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(255,122,0,0.45);}
+.btn-primary:disabled{opacity:0.3;cursor:default;transform:none;box-shadow:none;}
+.btn-reveal{background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;box-shadow:0 4px 18px rgba(124,58,237,0.35);}
+.btn-reveal:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(124,58,237,0.5);}
+.btn-ghost{background:transparent;border:1.5px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);}
+.btn-ghost:hover{border-color:rgba(255,255,255,0.4);color:#fff;}
+.btn-danger{background:transparent;border:1.5px solid rgba(255,80,80,0.3);color:rgba(255,80,80,0.6);}
+.btn-danger:hover{border-color:rgba(255,80,80,0.7);color:rgba(255,80,80,0.9);}
+.btn-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px;}
+.btn-full{width:100%;}
+
+/* ══ QUERIDÔMETRO ════════════════════════════════════ */
+.qpage-wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;}
+
+.vote-box{
+  position:relative;z-index:1;background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,122,0,0.22);backdrop-filter:blur(12px);
+  padding:26px 28px;border-radius:20px;max-width:580px;margin:0 auto 32px;text-align:center;
+}
+.vote-box h2{font-family:'Syne',sans-serif;font-size:19px;font-weight:700;color:#fff;margin-bottom:16px;}
+.selects{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:18px;}
+.emojis{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:18px;}
+.emoji-btn{
+  font-size:28px;cursor:pointer;padding:8px 10px;border-radius:12px;border:1.5px solid transparent;
+  background:rgba(255,255,255,0.05);transition:all 0.18s;line-height:1;display:inline-flex;align-items:center;
+}
+.emoji-btn:hover{transform:scale(1.3);background:rgba(255,122,0,0.15);border-color:rgba(255,122,0,0.4);}
+
+/* locked overlay on cards when hidden */
+.players-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:14px;}
+.pcard{
+  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);
+  backdrop-filter:blur(8px);border-radius:16px;padding:16px 14px;transition:all 0.24s;position:relative;overflow:hidden;
+}
+.pcard::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,122,0,0.07),transparent);opacity:0;transition:opacity 0.24s;}
+.pcard:hover{transform:translateY(-4px);border-color:rgba(255,122,0,0.3);box-shadow:0 10px 26px rgba(255,122,0,0.1);}
+.pcard:hover::before{opacity:1;}
+.pcard h3{
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:#fff;margin-bottom:9px;outline:none;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pcard h3:focus{white-space:normal;overflow:visible;border-bottom:1px dashed var(--orange);}
+.result{display:flex;flex-wrap:wrap;gap:4px;min-height:26px;}
+.badge{
+  background:rgba(255,122,0,0.14);border:1px solid rgba(255,122,0,0.24);
+  border-radius:20px;padding:2px 8px;font-size:12px;color:#fff;
+  display:inline-flex;align-items:center;gap:3px;transition:transform 0.14s;
+}
+.badge:hover{transform:scale(1.1);}
+.hidden-result{
+  display:flex;align-items:center;justify-content:center;
+  height:28px;font-size:20px;letter-spacing:4px;opacity:0.3;
+}
+
+/* reveal banner */
+.reveal-banner{
+  position:relative;z-index:1;
+  background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);
+  border-radius:16px;padding:18px 22px;max-width:580px;margin:0 auto 28px;
+  text-align:center;
+}
+.reveal-banner p{font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:12px;}
+.reveal-banner.revealed{background:rgba(100,255,150,0.07);border-color:rgba(100,255,150,0.3);}
+.reveal-banner.revealed p{color:rgba(100,255,150,0.7);}
+
+/* emoji progress */
+.emoji-progress{
+  display:flex;align-items:center;gap:10px;max-width:580px;margin:0 auto 24px;
+  position:relative;z-index:1;
+}
+.eprog-bar{flex:1;height:6px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;}
+.eprog-fill{height:100%;background:linear-gradient(90deg,#ff7a00,#ffb347);border-radius:4px;transition:width 0.4s;}
+.eprog-label{font-size:12px;color:rgba(255,255,255,0.35);white-space:nowrap;}
+
+/* ══ VOTAÇÃO ══════════════════════════════════════════ */
+.poll-wrap{position:relative;z-index:1;max-width:700px;margin:0 auto;}
+
+.who-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:9px;}
+.who-card{
+  padding:11px 8px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.04);cursor:pointer;text-align:center;
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,0.65);transition:all 0.18s;
+}
+.who-card:hover{border-color:rgba(255,122,0,0.5);color:#fff;background:rgba(255,122,0,0.08);}
+.who-card.active{border-color:var(--orange);color:#fff;background:rgba(255,122,0,0.18);box-shadow:0 0 0 3px rgba(255,122,0,0.12);}
+.who-card.done{border-color:rgba(100,255,150,0.35);background:rgba(100,255,150,0.06);color:rgba(100,255,150,0.75);cursor:default;pointer-events:none;}
+.who-card.done::after{content:' ✓';font-size:10px;}
+
+.poll-step{display:none;}.poll-step.visible{display:block;}
+.voter-label{color:var(--amber);}
+
+.candidates-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:9px;margin-bottom:20px;}
+.cand-card{
+  padding:13px 8px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.04);cursor:pointer;text-align:center;
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,0.65);transition:all 0.18s;
+}
+.cand-card:hover{border-color:rgba(255,122,0,0.5);color:#fff;background:rgba(255,122,0,0.08);}
+.cand-card.active{border-color:var(--orange);color:#fff;background:rgba(255,122,0,0.2);box-shadow:0 0 0 3px rgba(255,122,0,0.14);}
+
+/* results */
+.results-panel{
+  position:relative;z-index:1;max-width:700px;margin:0 auto;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:26px 28px;
+}
+.results-panel h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:6px;color:rgba(255,255,255,0.6);}
+.results-panel .sub{font-size:13px;color:rgba(255,255,255,0.35);margin-bottom:16px;}
+
+/* locked results */
+.locked-results{text-align:center;padding:32px 0;}
+.lock-icon{font-size:48px;margin-bottom:12px;}
+.lock-text{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;margin-bottom:4px;}
+.lock-sub{font-size:13px;color:rgba(255,255,255,0.35);}
+.progress-row{display:flex;align-items:center;gap:10px;margin:18px 0 0;}
+.prog-bar{flex:1;height:8px;background:rgba(255,255,255,0.08);border-radius:6px;overflow:hidden;}
+.prog-fill{height:100%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:6px;transition:width 0.4s;}
+.prog-label{font-size:12px;color:rgba(255,255,255,0.4);white-space:nowrap;}
+
+.rrow{display:flex;align-items:center;gap:12px;margin-bottom:11px;}
+.rrow .rname{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;width:100px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rrow .bwrap{flex:1;background:rgba(255,255,255,0.07);border-radius:6px;height:20px;overflow:hidden;}
+.rrow .bfill{height:100%;border-radius:6px;background:linear-gradient(90deg,#ff7a00,#ffb347);transition:width 0.5s cubic-bezier(.4,0,.2,1);}
+.rrow .rcnt{font-size:13px;font-weight:700;color:var(--amber);width:24px;text-align:right;flex-shrink:0;}
+
+/* winner card */
+.winner-card{
+  background:linear-gradient(135deg,rgba(255,122,0,0.18),rgba(255,179,71,0.1));
+  border:1.5px solid rgba(255,122,0,0.4);border-radius:14px;
+  padding:16px 20px;margin-bottom:20px;text-align:center;
+}
+.winner-card .wlabel{font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.winner-card .wname{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--amber);}
+.winner-card .wcnt{font-size:13px;color:rgba(255,255,255,0.5);margin-top:2px;}
+
+.stats{display:flex;gap:24px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.07);}
+.stat .val{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--orange);}
+.stat .lbl{font-size:11px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.5px;}
+
+/* individual reveal */
+.reveal-list{margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.07);}
+.reveal-list h4{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,0.4);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;}
+.reveal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;}
+.reveal-item{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;padding:12px 10px;cursor:pointer;text-align:center;
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,0.65);
+  transition:all 0.2s;position:relative;
+}
+.reveal-item:hover{border-color:rgba(124,58,237,0.5);color:#fff;background:rgba(124,58,237,0.1);}
+.reveal-item.opened{
+  border-color:rgba(100,255,150,0.35);background:rgba(100,255,150,0.06);color:#fff;cursor:default;
+}
+.reveal-item .voted-for{font-size:11px;color:rgba(100,255,150,0.8);margin-top:4px;font-family:'DM Sans',sans-serif;font-weight:400;}
+.reveal-item .mystery{font-size:18px;margin-top:2px;}
+
+@media(max-width:480px){
+  .vote-box,.panel,.results-panel{padding:20px 14px;}
+  .who-grid,.candidates-grid,.reveal-grid{grid-template-columns:repeat(auto-fill,minmax(95px,1fr));}
+  .stats{flex-wrap:wrap;gap:14px;}
+  .btn-row{flex-direction:column;}
+}
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+<div id="db-status">⬤ db</div>
+
+<h1>Queridômetro</h1>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('queridometro',this)">❤️ Queridômetro</button>
+  <button class="tab-btn" onclick="switchTab('votacao',this)">🗳️ Votação</button>
+</div>
+
+<!-- ═══════════════ QUERIDÔMETRO ═══════════════════════ -->
+<div class="page active" id="page-queridometro">
+
+  <div class="vote-box">
+    <h2>Dar Emoji</h2>
+    <div class="selects">
+      <select id="giver"><option value="" disabled selected>De quem?</option></select>
+      <select id="receiver"><option value="" disabled selected>Para quem?</option></select>
+    </div>
+    <div class="emojis">
+      <span class="emoji-btn" onclick="sendEmoji('🎯')">🎯</span>
+      <span class="emoji-btn" onclick="sendEmoji('🍪')">🍪</span>
+      <span class="emoji-btn" onclick="sendEmoji('💔')">💔</span>
+      <span class="emoji-btn" onclick="sendEmoji('❤️')">❤️</span>
+      <span class="emoji-btn" onclick="sendEmoji('🧳')">🧳</span>
+      <span class="emoji-btn" onclick="sendEmoji('🤥')">🤥</span>
+      <span class="emoji-btn" onclick="sendEmoji('🌱')">🌱</span>
+      <span class="emoji-btn" onclick="sendEmoji('🤮')">🤮</span>
+      <span class="emoji-btn" onclick="sendEmoji('🐍')">🐍</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-reveal" onclick="revealEmojis()">🔮 Revelar emojis</button>
+      <button class="btn btn-danger" onclick="resetEmojis()">🗑 Zerar emojis</button>
+    </div>
+  </div>
+
+  <div id="emoji-reveal-banner" class="reveal-banner" style="display:none"></div>
+
+  <div class="players-grid" id="players-grid"></div>
+</div>
+
+<!-- ═══════════════ VOTAÇÃO ══════════════════════════ -->
+<div class="page" id="page-votacao">
+  <div class="poll-wrap">
+
+    <div class="panel">
+      <h2>Quem é você?</h2>
+      <p class="sub">Selecione seu nome — cada participante tem direito a 1 voto</p>
+      <div class="who-grid" id="who-grid"></div>
+    </div>
+
+    <div class="panel poll-step" id="poll-step">
+      <h2>Votando como <span class="voter-label" id="voter-label">—</span></h2>
+      <p class="sub">Escolha um participante e confirme</p>
+      <div class="candidates-grid" id="candidates-grid"></div>
+      <button class="btn btn-primary btn-full" id="confirm-btn" disabled onclick="confirmVote()">✅ Confirmar voto</button>
+    </div>
+
+  </div>
+
+  <div class="results-panel">
+    <h3>📊 Resultados</h3>
+    <p class="sub" id="results-sub">Os votos serão revelados quando todos votarem</p>
+    <div id="results-area"></div>
+    <div class="stats" id="poll-stats-row">
+      <div class="stat"><div class="val" id="stat-voted">0</div><div class="lbl">votaram</div></div>
+      <div class="stat"><div class="val" id="stat-total">0</div><div class="lbl">total</div></div>
+      <div class="stat"><div class="val" id="stat-pct">0%</div><div class="lbl">participação</div></div>
+    </div>
+    <div class="btn-row" id="poll-actions">
+      <button class="btn btn-reveal" id="btn-reveal-votes" onclick="revealVotes()" style="display:none">🔮 Revelar votos</button>
+      <button class="btn btn-danger" onclick="resetPoll()">🗑 Zerar votação</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══ STATE ════════════════════════════════════════════ */
+let players = [
+  "Pedro","Vinicius","Façanha","Ândrea","Miguel","Clara","Emilly",
+  "Guilherme","Itamar","Valentim","Judhy","Lara","Livia","Malu",
+  "Milena","Arthur","Raul","Rillary","Matheus","Eduardo"
+];
+let emojiVotes    = {};   // "gi-re": {giver,receiver,emoji}
+let emojiRevealed = false;
+let openedEmoji   = {};   // playerIndex: true (individual card opened)
+
+let pollVotes     = {};   // voterIndex: candidateIndex
+let pollRevealed  = false;
+let openedVotes   = {};   // voterIndex: true (individual reveal clicked)
+let curVoter      = null;
+let curCand       = null;
+
+/* ══ DB ═══════════════════════════════════════════════ */
+const K_NAMES  = 'queridometro-names';
+const K_EMOJI  = 'queridometro-votes';
+const K_EREV   = 'queridometro-emoji-revealed';
+const K_EOPEN  = 'queridometro-emoji-opened';
+const K_POLL   = 'queridometro-poll';
+const K_PREV   = 'queridometro-poll-revealed';
+const K_POPEN  = 'queridometro-poll-opened';
+
+const dbEl = document.getElementById('db-status');
+function setStatus(c,m){dbEl.className=c;dbEl.textContent=m;}
+async function dbGet(k){try{const r=await window.storage.get(k,true);return r?JSON.parse(r.value):null;}catch{return null;}}
+async function dbSet(k,v){
+  try{await window.storage.set(k,JSON.stringify(v),true);setStatus('saved','⬤ salvo');setTimeout(()=>setStatus('','⬤ db'),1800);}
+  catch(e){setStatus('error','⬤ erro');}
+}
+
+/* ══ TABS ═════════════════════════════════════════════ */
+function switchTab(tab,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ══ TOAST ════════════════════════════════════════════ */
+let tt;
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2300);
+}
+
+/* ══ QUERIDÔMETRO ════════════════════════════════════ */
+function setupSelects(){
+  const g=document.getElementById('giver'),r=document.getElementById('receiver');
+  g.innerHTML='<option value="" disabled selected>De quem?</option>';
+  r.innerHTML='<option value="" disabled selected>Para quem?</option>';
+  players.forEach((p,i)=>{
+    g.innerHTML+=`<option value="${i}">${p}</option>`;
+    r.innerHTML+=`<option value="${i}">${p}</option>`;
+  });
+}
+
+function renderCards(){
+  const grid = document.getElementById('players-grid');
+  grid.innerHTML = '';
+
+  // Reveal banner
+  const banner = document.getElementById('emoji-reveal-banner');
+  const sentCount = Object.keys(emojiVotes).length;
+  if(emojiRevealed){
+    banner.style.display='block';
+    banner.className='reveal-banner revealed';
+    banner.innerHTML=`<p>✅ Emojis revelados — ${sentCount} emoji${sentCount!==1?'s':''} enviados</p>
+      <div class="btn-row"><button class="btn btn-danger" onclick="resetEmojis()">🗑 Zerar emojis</button></div>`;
+  } else {
+    banner.style.display = sentCount > 0 ? 'block' : 'none';
+    banner.className = 'reveal-banner';
+    banner.innerHTML = `<p>🔒 ${sentCount} emoji${sentCount!==1?'s':''} enviados — ocultos até revelar</p>`;
+  }
+
+  players.forEach((name,idx)=>{
+    const cnt={};
+    Object.values(emojiVotes).forEach(v=>{if(+v.receiver===idx)cnt[v.emoji]=(cnt[v.emoji]||0)+1;});
+    const hasVotes = Object.keys(cnt).length > 0;
+    const isOpen   = openedEmoji[idx] || emojiRevealed;
+
+    let resultHtml;
+    if(!emojiRevealed && !openedEmoji[idx]){
+      // hidden
+      resultHtml = hasVotes
+        ? `<div class="hidden-result">🔒 ••••</div>`
+        : `<span style="color:rgba(255,255,255,0.18);font-size:11px">sem emojis</span>`;
+    } else {
+      const badges = Object.entries(cnt).sort((a,b)=>b[1]-a[1])
+        .map(([e,n])=>`<span class="badge">${e}<b>${n}</b></span>`).join('');
+      resultHtml = badges || `<span style="color:rgba(255,255,255,0.18);font-size:11px">sem emojis</span>`;
+    }
+
+    const revealBtn = hasVotes && !isOpen
+      ? `<button onclick="openEmojiCard(${idx})" style="margin-top:8px;font-size:11px;background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.4);color:#a78bfa;padding:4px 10px;border-radius:20px;cursor:pointer;">Revelar</button>`
+      : '';
+
+    grid.innerHTML+=`
+      <div class="pcard">
+        <h3 contenteditable="true" onblur="renamePlayer(${idx},this.innerText)" title="Clique para editar">${name}</h3>
+        <div class="result">${resultHtml}</div>
+        ${revealBtn}
+      </div>`;
+  });
+}
+
+async function openEmojiCard(idx){
+  openedEmoji[idx]=true;
+  renderCards();
+  await dbSet(K_EOPEN,openedEmoji);
+}
+
+async function sendEmoji(emoji){
+  const g=document.getElementById('giver').value, r=document.getElementById('receiver').value;
+  if(g===''||r===''){showToast('⚠️ Selecione quem envia e quem recebe');return;}
+  if(g===r){showToast('🚫 Não pode votar em si mesmo');return;}
+  emojiVotes[`${g}-${r}`]={giver:g,receiver:r,emoji};
+  renderCards();
+  await dbSet(K_EMOJI,emojiVotes);
+  showToast(`${emoji} de ${players[+g]} → ${players[+r]}`);
+}
+
+async function revealEmojis(){
+  if(!confirm('Revelar TODOS os emojis para todos?'))return;
+  emojiRevealed=true;openedEmoji={};
+  renderCards();
+  await dbSet(K_EREV,true);await dbSet(K_EOPEN,{});
+  showToast('🔮 Emojis revelados!');
+}
+
+async function resetEmojis(){
+  if(!confirm('Zerar todos os emojis?'))return;
+  emojiVotes={};emojiRevealed=false;openedEmoji={};
+  renderCards();
+  await dbSet(K_EMOJI,{});await dbSet(K_EREV,false);await dbSet(K_EOPEN,{});
+  showToast('🗑 Emojis zerados');
+}
+
+async function renamePlayer(i,name){
+  const t=name.trim();if(!t)return;
+  players[i]=t;setupSelects();renderCards();renderPoll();
+  await dbSet(K_NAMES,players);showToast(`✏️ "${t}"`);
+}
+
+/* ══ VOTAÇÃO ══════════════════════════════════════════ */
+function renderPoll(){
+  const voted = Object.keys(pollVotes).length;
+  const total = players.length;
+  const allVoted = voted >= total;
+
+  // who-grid
+  const wg=document.getElementById('who-grid');wg.innerHTML='';
+  players.forEach((name,i)=>{
+    const v=pollVotes.hasOwnProperty(i);
+    const a=curVoter===i;
+    wg.innerHTML+=`<div class="who-card${v?' done':a?' active':''}"
+      onclick="${v?'':(`selectVoter(${i})`)}" title="${v?'Já votou':'Selecionar'}">${name}</div>`;
+  });
+
+  // step 2
+  const step=document.getElementById('poll-step');
+  if(curVoter===null){step.classList.remove('visible');}
+  else{
+    step.classList.add('visible');
+    document.getElementById('voter-label').textContent=players[curVoter];
+    const cg=document.getElementById('candidates-grid');cg.innerHTML='';
+    players.forEach((name,i)=>{
+      if(i===curVoter)return;
+      cg.innerHTML+=`<div class="cand-card${curCand===i?' active':''}" onclick="selectCand(${i})">${name}</div>`;
+    });
+    document.getElementById('confirm-btn').disabled=curCand===null;
+  }
+
+  // stats
+  document.getElementById('stat-voted').textContent=voted;
+  document.getElementById('stat-total').textContent=total;
+  document.getElementById('stat-pct').textContent=Math.round(voted/total*100)+'%';
+
+  // reveal button visibility
+  const revBtn = document.getElementById('btn-reveal-votes');
+  revBtn.style.display = (allVoted && !pollRevealed) ? 'inline-flex' : 'none';
+
+  // results area
+  renderResults(allVoted);
+}
+
+function renderResults(allVoted){
+  const area = document.getElementById('results-area');
+  const sub  = document.getElementById('results-sub');
+  const voted = Object.keys(pollVotes).length;
+  const total = players.length;
+
+  if(pollRevealed){
+    // full reveal with winner + bars
+    sub.textContent = '✅ Votos revelados';
+    const cnt={};players.forEach((_,i)=>cnt[i]=0);
+    Object.values(pollVotes).forEach(v=>{cnt[v]=(cnt[v]||0)+1;});
+    const max=Math.max(...Object.values(cnt),1);
+    const sorted=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+    const [topIdx,topCnt]=sorted[0];
+
+    let html='';
+    if(topCnt>0){
+      html+=`<div class="winner-card">
+        <div class="wlabel">🏆 Mais votado</div>
+        <div class="wname">${players[+topIdx]}</div>
+        <div class="wcnt">${topCnt} voto${topCnt!==1?'s':''}</div>
+      </div>`;
+    }
+    sorted.forEach(([idx,n])=>{
+      if(n===0)return;
+      const pct=Math.round(n/max*100);
+      html+=`<div class="rrow">
+        <span class="rname">${players[+idx]}</span>
+        <div class="bwrap"><div class="bfill" style="width:${pct}%"></div></div>
+        <span class="rcnt">${n}</span></div>`;
+    });
+
+    // individual reveal list
+    html+=`<div class="reveal-list">
+      <h4>Revelar voto por pessoa</h4>
+      <div class="reveal-grid">`;
+    players.forEach((name,i)=>{
+      if(!pollVotes.hasOwnProperty(i))return;
+      const isOpen=openedVotes[i];
+      const votedFor=isOpen?players[pollVotes[i]]:null;
+      html+=`<div class="reveal-item${isOpen?' opened':''}" ${isOpen?'':'onclick="openVote('+i+')"'}>
+        ${name}
+        ${isOpen
+          ? `<div class="voted-for">→ ${votedFor}</div>`
+          : `<div class="mystery">🎭</div>`
+        }
+      </div>`;
+    });
+    html+=`</div></div>`;
+    area.innerHTML=html;
+
+  } else if(allVoted){
+    // all voted, waiting for reveal
+    sub.textContent='Todos votaram! Clique em "Revelar votos" quando estiver pronto.';
+    area.innerHTML=`<div class="locked-results">
+      <div class="lock-icon">🔒</div>
+      <div class="lock-text">Votos prontos para revelar</div>
+      <div class="lock-sub">${voted} de ${total} participantes votaram</div>
+    </div>`;
+  } else {
+    // still voting — show lock + progress
+    const pct=Math.round(voted/total*100);
+    sub.textContent='Os votos serão revelados quando todos votarem';
+    area.innerHTML=`<div class="locked-results">
+      <div class="lock-icon">🔒</div>
+      <div class="lock-text">Aguardando votos…</div>
+      <div class="lock-sub">${voted} de ${total} participantes votaram</div>
+      <div class="progress-row">
+        <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+        <span class="prog-label">${pct}%</span>
+      </div>
+    </div>`;
+  }
+}
+
+function selectVoter(i){
+  if(pollVotes.hasOwnProperty(i)){showToast('✅ Você já votou!');return;}
+  curVoter=i;curCand=null;renderPoll();
+}
+function selectCand(i){curCand=i;renderPoll();}
+
+async function confirmVote(){
+  if(curVoter===null||curCand===null)return;
+  pollVotes[curVoter]=curCand;
+  showToast(`✅ Voto de ${players[curVoter]} registrado!`);
+  curVoter=null;curCand=null;
+  renderPoll();await dbSet(K_POLL,pollVotes);
+
+  // auto check all voted
+  if(Object.keys(pollVotes).length>=players.length){
+    showToast('🎉 Todos votaram! Pronto para revelar.');
+  }
+}
+
+async function revealVotes(){
+  if(!confirm('Revelar todos os votos agora?'))return;
+  pollRevealed=true;openedVotes={};
+  renderPoll();
+  await dbSet(K_PREV,true);await dbSet(K_POPEN,{});
+  showToast('🔮 Votos revelados!');
+}
+
+async function openVote(i){
+  openedVotes[i]=true;
+  renderPoll();
+  await dbSet(K_POPEN,openedVotes);
+}
+
+async function resetPoll(){
+  if(!confirm('Zerar toda a votação?'))return;
+  pollVotes={};pollRevealed=false;openedVotes={};curVoter=null;curCand=null;
+  renderPoll();
+  await dbSet(K_POLL,{});await dbSet(K_PREV,false);await dbSet(K_POPEN,{});
+  showToast('🗑 Votação zerada');
+}
+
+/* ══ INIT ═════════════════════════════════════════════ */
+async function init(){
+  setStatus('','⬤ carregando…');
+  const sn=await dbGet(K_NAMES);if(sn&&Array.isArray(sn))players=sn;
+  const se=await dbGet(K_EMOJI);if(se&&typeof se==='object')emojiVotes=se;
+  const ser=await dbGet(K_EREV);if(ser===true)emojiRevealed=true;
+  const seo=await dbGet(K_EOPEN);if(seo&&typeof seo==='object')openedEmoji=seo;
+  const sp=await dbGet(K_POLL);if(sp&&typeof sp==='object')pollVotes=sp;
+  const spr=await dbGet(K_PREV);if(spr===true)pollRevealed=true;
+  const spo=await dbGet(K_POPEN);if(spo&&typeof spo==='object')openedVotes=spo;
+
+  setupSelects();renderCards();renderPoll();
+  setStatus('saved',`⬤ ${Object.keys(emojiVotes).length} emojis · ${Object.keys(pollVotes).length} votos`);
+  setTimeout(()=>setStatus('','⬤ db'),2800);
+}
+
+init();
+</script>
+</body>
+</html>
